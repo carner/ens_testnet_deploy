@@ -1,11 +1,11 @@
 pragma solidity >=0.8.4;
-import '@ensdomains/ens-contracts/contracts/registry/ENS.sol';
+// import '@ensdomains/ens-contracts/contracts/registry/ENS.sol';
 import {INameWrapper, PublicResolver} from '@ensdomains/ens-contracts/contracts/resolvers/PublicResolver.sol';
 import '@ensdomains/ens-contracts/contracts/registry/ENSRegistry.sol';
 import '@ensdomains/ens-contracts/contracts/registry/FIFSRegistrar.sol';
-import '@ensdomains/ens-contracts/contracts/registry/IReverseRegistrar.sol';
-import '@openzeppelin/contracts/access/Ownable.sol';
-import '@ensdomains/ens-contracts/contracts/root/Controllable.sol';
+// import '@ensdomains/ens-contracts/contracts/registry/IReverseRegistrar.sol';
+// import '@openzeppelin/contracts/access/Ownable.sol';
+// import '@ensdomains/ens-contracts/contracts/root/Controllable.sol';
 import {NameResolver, ReverseRegistrar} from '@ensdomains/ens-contracts/contracts/registry/ReverseRegistrar.sol';
 
 // Construct a set of test ENS contracts.

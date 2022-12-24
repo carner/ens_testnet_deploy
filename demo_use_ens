@@ -5,6 +5,12 @@ import {INameWrapper, PublicResolver} from '@ensdomains/ens-contracts/contracts/
 import '@ensdomains/ens-contracts/contracts/registry/ENSRegistry.sol';
 import '@ensdomains/ens-contracts/contracts/registry/FIFSRegistrar.sol';
 import {NameResolver, ReverseRegistrar} from '@ensdomains/ens-contracts/contracts/registry/ReverseRegistrar.sol';
+import {BaseRegistrarImplementation} from '@ensdomains/ens-contracts/contracts/ethregistrar/BaseRegistrarImplementation.sol';
+import {StaticMetadataService} from '@ensdomains/ens-contracts/contracts/wrapper/StaticMetadataService.sol';
+import {NameWrapper} from '@ensdomains/ens-contracts/contracts/wrapper/NameWrapper.sol';
+import {DummyOracle} from '@ensdomains/ens-contracts/contracts/ethregistrar/DummyOracle.sol';
+import {AggregatorInterface, StablePriceOracle} from '@ensdomains/ens-contracts/contracts/ethregistrar/StablePriceOracle.sol';
+import {ETHRegistrarController} from '@ensdomains/ens-contracts/contracts/ethregistrar/ETHRegistrarController.sol';
 
 /**
  * @title Storage
@@ -22,9 +28,65 @@ contract ENSDeployer {
   FIFSRegistrar public fifsRegistrar;
   ReverseRegistrar public reverseRegistrar;
   PublicResolver public publicResolver;
+  BaseRegistrarImplementation public baseRegistrar;
+  StaticMetadataService public staticMetadataService;
+  NameWrapper public nameWrapper;
+  DummyOracle public dummyOracle;
+  StablePriceOracle public stablePriceOracle;
 
   function namehash(bytes32 node, bytes32 label) public pure returns (bytes32) {
     return keccak256(abi.encodePacked(node, label));
+  }
+
+  constructor() public {
+    ens = new ENSRegistry();
+
+    // create base registrar
+    baseRegistrar = new BaseRegistrarImplementation(ens, namehash(bytes32(0), TLD_LABEL));
+    ens.setSubnodeOwner(bytes32(0), TLD_LABEL, address(baseRegistrar));
+
+    // create staticMetadataService
+    staticMetadataService = new StaticMetadataService("https://ens.domains");
+
+    // create NameWrapper
+    nameWrapper = new NameWrapper(ens, baseRegistrar, staticMetadataService);
+
+    // create DummyOracle
+    dummyOracle = new DummyOracle(100000000);
+
+    //create StablePriceOracle
+    // uint256[5] memory a = [uint256(0), uint256(0), uint256(4), uint256(2), uint256(1)];
+    uint256[] memory a;
+    a[0] = uint256(0);
+    a[1] = uint256(0);
+    a[2] = uint256(4);
+    a[3] = uint256(2);
+    a[4] = uint256(1);
+    stablePriceOracle = new StablePriceOracle(AggregatorInterface(address(dummyOracle)), a);
+
+    // create public resolver
+    publicResolver = new PublicResolver(ens, INameWrapper(address(0)), address(0), address(0));
+
+    // Set up the resolver
+    bytes32 resolverNode = namehash(bytes32(0), RESOLVER_LABEL);
+    ens.setSubnodeOwner(bytes32(0), RESOLVER_LABEL, address(this));
+    ens.setResolver(resolverNode, address(publicResolver));
+    publicResolver.setAddr(resolverNode, address(publicResolver));
+
+    // Create a FIFS registrar for the TLD
+    fifsRegistrar = new FIFSRegistrar(ens, namehash(bytes32(0), TLD_LABEL));
+    // ens.setSubnodeOwner(bytes32(0), TLD_LABEL, address(fifsRegistrar));
+
+    // Construct a new reverse registrar and point it at the public resolver
+    reverseRegistrar = new ReverseRegistrar(ens);
+
+    // Set up the reverse registrar
+    ens.setSubnodeOwner(bytes32(0), REVERSE_REGISTRAR_LABEL, address(this));
+    ens.setSubnodeOwner(
+      namehash(bytes32(0), REVERSE_REGISTRAR_LABEL),
+      ADDR_LABEL,
+      address(reverseRegistrar)
+    );
   }
 
   function stringToBytes32(string memory source) public pure returns (bytes32 result) {
@@ -58,31 +120,5 @@ contract ENSDeployer {
   function resolveraddr(string memory source) public view returns (address) {
     bytes32 tmp = to_keccak256(source);
     return ens.resolver(namehash(bytes32(0), tmp));
-  }
-
-  constructor() public {
-    ens = new ENSRegistry();
-    publicResolver = new PublicResolver(ens, INameWrapper(address(0)), address(0), address(0));
-
-    // Set up the resolver
-    bytes32 resolverNode = namehash(bytes32(0), RESOLVER_LABEL);
-    ens.setSubnodeOwner(bytes32(0), RESOLVER_LABEL, address(this));
-    ens.setResolver(resolverNode, address(publicResolver));
-    publicResolver.setAddr(resolverNode, address(publicResolver));
-
-    // Create a FIFS registrar for the TLD
-    fifsRegistrar = new FIFSRegistrar(ens, namehash(bytes32(0), TLD_LABEL));
-    ens.setSubnodeOwner(bytes32(0), TLD_LABEL, address(fifsRegistrar));
-
-    // Construct a new reverse registrar and point it at the public resolver
-    reverseRegistrar = new ReverseRegistrar(ens);
-
-    // Set up the reverse registrar
-    ens.setSubnodeOwner(bytes32(0), REVERSE_REGISTRAR_LABEL, address(this));
-    ens.setSubnodeOwner(
-      namehash(bytes32(0), REVERSE_REGISTRAR_LABEL),
-      ADDR_LABEL,
-      address(reverseRegistrar)
-    );
   }
 }
